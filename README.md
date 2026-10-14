@@ -34,6 +34,9 @@ Results CSV columns: `method, center, seed, auroc, sensitivity, ece`
 
 ```bash
 pip install -r requirements.txt
+conda create -n ecg-fl python=3.10 pip -y
+conda activate ecg-fl
+
 python -m pytest tests          # server tests, no data needed
 python -m fl.server             # end-to-end FedAvg (needs data.py + client.py)
 ```
