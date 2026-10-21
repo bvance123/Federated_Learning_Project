@@ -3,6 +3,7 @@
 Owner: Bennett
 """
 import numpy as np
+from sklearn.metrics import roc_auc_score
 
 
 def sensitivity(y_true, y_prob, cutoff=0.5):
@@ -26,3 +27,19 @@ def sensitivity(y_true, y_prob, cutoff=0.5):
     false_negatives = (y_guess[sick] == 0).sum()
 
     return float((n_sick - false_negatives) / n_sick)
+
+
+def auroc(y_true, y_prob):
+    """Chance a random sick patient gets a higher probability than a random healthy one.
+
+    0.5 = coin flip, 1.0 = perfect. Returns NaN if the sample has only sick or
+    only healthy patients (no pairs to compare).
+    """
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob)
+
+    # Need at least one sick and one healthy patient to form a pair
+    if len(np.unique(y_true)) < 2:
+        return float("nan")
+
+    return float(roc_auc_score(y_true, y_prob))
