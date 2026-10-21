@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from eval.metrics import auroc, sensitivity
+from eval.metrics import auroc, brier, ece, sensitivity
 
 # Small hand-checked example: A, B, C sick; D, E, F healthy
 Y_TRUE = [1, 1, 1, 0, 0, 0]
@@ -52,3 +52,44 @@ def test_auroc_backwards_ranking():
 def test_auroc_one_class_is_nan():
     assert math.isnan(auroc([0, 0, 0], [0.2, 0.8, 0.5]))
     assert math.isnan(auroc([1, 1, 1], [0.2, 0.8, 0.5]))
+
+
+def test_ece_hand_example():
+    # Low bin: 4 patients told 0.2, 1 sick (gap 0.05)
+    # High bin: 6 patients told 0.8, 3 sick (gap 0.3)
+    # ECE = 0.4 * 0.05 + 0.6 * 0.3 = 0.20
+    y_true = [1, 0, 0, 0] + [1, 1, 1, 0, 0, 0]
+    y_prob = [0.2] * 4 + [0.8] * 6
+    assert ece(y_true, y_prob, n_bins=2) == pytest.approx(0.20)
+
+
+def test_ece_honest_guesser_is_zero():
+    # Told 0.5, and exactly half were sick
+    assert ece([1, 0, 1, 0], [0.5, 0.5, 0.5, 0.5]) == pytest.approx(0.0)
+
+
+def test_ece_single_patient_is_inflated():
+    # Even an honest "0.7" scores a big gap with one patient: the small-sample problem
+    assert ece([1], [0.7]) == pytest.approx(0.3)
+    assert ece([0], [0.7]) == pytest.approx(0.7)
+
+
+def test_ece_probability_one_lands_in_top_bin():
+    assert ece([1], [1.0]) == pytest.approx(0.0)
+
+
+def test_ece_empty_is_nan():
+    assert math.isnan(ece([], []))
+
+
+def test_brier_hand_example():
+    # ((0.8 - 1)^2 + (0.3 - 0)^2) / 2 = (0.04 + 0.09) / 2
+    assert brier([1, 0], [0.8, 0.3]) == pytest.approx(0.065)
+
+
+def test_brier_perfect_confident_guesser_is_zero():
+    assert brier([1, 0, 1], [1.0, 0.0, 1.0]) == 0.0
+
+
+def test_brier_empty_is_nan():
+    assert math.isnan(brier([], []))
