@@ -1,8 +1,10 @@
+import csv
 import math
 
 import pytest
+import torch
 
-from eval.metrics import auroc, brier, ece, sensitivity
+from eval.metrics import COLUMNS, append_rows, auroc, brier, ece, evaluate, sensitivity
 
 # Small hand-checked example: A, B, C sick; D, E, F healthy
 Y_TRUE = [1, 1, 1, 0, 0, 0]
@@ -93,3 +95,33 @@ def test_brier_perfect_confident_guesser_is_zero():
 
 def test_brier_empty_is_nan():
     assert math.isnan(brier([], []))
+
+
+def test_evaluate_builds_row_from_hand_example():
+    row = evaluate("local_only", 2, 0, Y_TRUE, Y_PROB)
+    assert list(row) == COLUMNS
+    assert row["method"] == "local_only" and row["center"] == 2 and row["seed"] == 0
+    assert row["mu"] == ""  # no leash for local-only
+    assert row["auroc"] == pytest.approx(8 / 9)
+    assert row["sensitivity"] == pytest.approx(2 / 3)
+
+
+def test_evaluate_accepts_torch_tensors():
+    row = evaluate("ditto", 0, 1, torch.tensor(Y_TRUE).float(), torch.tensor(Y_PROB), mu=0.1)
+    assert row["mu"] == 0.1
+    assert row["auroc"] == pytest.approx(8 / 9)
+
+
+def test_evaluate_rejects_mismatched_lengths():
+    with pytest.raises(ValueError):
+        evaluate("local_only", 0, 0, [1, 0], [0.5])
+
+
+def test_append_rows_writes_header_once(tmp_path):
+    path = tmp_path / "results.csv"
+    append_rows([evaluate("local_only", 0, 0, Y_TRUE, Y_PROB)], path)
+    append_rows([evaluate("local_only", 1, 0, Y_TRUE, Y_PROB)], path)
+    with open(path) as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 2  # header written only once
+    assert [r["center"] for r in rows] == ["0", "1"]

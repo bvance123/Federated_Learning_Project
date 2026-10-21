@@ -2,8 +2,14 @@
 
 Owner: Bennett
 """
+import csv
+import os
+
 import numpy as np
 from sklearn.metrics import roc_auc_score
+
+# Shared results CSV format (one row per method, hospital, seed, mu)
+COLUMNS = ["method", "center", "seed", "mu", "auroc", "sensitivity", "ece", "brier"]
 
 
 def sensitivity(y_true, y_prob, cutoff=0.5):
@@ -85,3 +91,40 @@ def brier(y_true, y_prob):
     if len(y_true) == 0:
         return float("nan")
     return float(np.mean((y_prob - y_true) ** 2))
+
+
+def evaluate(method, center, seed, y_true, y_prob, mu=None):
+    """Score one hospital's exam predictions and return one results row (a dict).
+
+    y_true: real outcomes on this hospital's test set (0/1)
+    y_prob: the model's P(disease) for the same patients, same order
+    mu:     leash strength, or None for methods without one (left blank in the CSV)
+    """
+    # Accept torch tensors as well as lists/arrays
+    if hasattr(y_true, "detach"):
+        y_true = y_true.detach().cpu().numpy()
+    if hasattr(y_prob, "detach"):
+        y_prob = y_prob.detach().cpu().numpy()
+    if len(y_true) != len(y_prob):
+        raise ValueError("y_true and y_prob must have one entry per patient")
+
+    return {
+        "method": method,
+        "center": center,
+        "seed": seed,
+        "mu": "" if mu is None else mu,
+        "auroc": auroc(y_true, y_prob),
+        "sensitivity": sensitivity(y_true, y_prob),
+        "ece": ece(y_true, y_prob),
+        "brier": brier(y_true, y_prob),
+    }
+
+
+def append_rows(rows, path):
+    """Add rows to the results CSV, writing the header first if the file is new."""
+    new_file = not os.path.exists(path)
+    with open(path, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=COLUMNS)
+        if new_file:
+            writer.writeheader()
+        writer.writerows(rows)
