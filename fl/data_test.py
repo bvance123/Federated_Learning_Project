@@ -1,4 +1,4 @@
-from data import load_center
+from fl.data import load_center
 
 for center in [0, 1, 2, 3]:
     train, val, test = load_center(center, seed=42)
