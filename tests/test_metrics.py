@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from eval.metrics import sensitivity
+from eval.metrics import auroc, sensitivity
 
 # Small hand-checked example: A, B, C sick; D, E, F healthy
 Y_TRUE = [1, 1, 1, 0, 0, 0]
@@ -33,3 +33,22 @@ def test_sensitivity_misses_only_sick_patient():
 
 def test_sensitivity_exactly_at_cutoff_counts_as_caught():
     assert sensitivity([1], [0.5]) == 1.0
+
+
+def test_auroc_hand_example():
+    # 9 sick-healthy pairs; only B (0.4) vs E (0.6) is ranked wrong
+    assert auroc(Y_TRUE, Y_PROB) == pytest.approx(8 / 9)
+
+
+def test_auroc_perfect_ranking():
+    assert auroc([1, 1, 0, 0], [0.9, 0.8, 0.2, 0.1]) == 1.0
+
+
+def test_auroc_backwards_ranking():
+    # Every healthy patient ranked above every sick one
+    assert auroc([1, 1, 0, 0], [0.1, 0.2, 0.8, 0.9]) == 0.0
+
+
+def test_auroc_one_class_is_nan():
+    assert math.isnan(auroc([0, 0, 0], [0.2, 0.8, 0.5]))
+    assert math.isnan(auroc([1, 1, 1], [0.2, 0.8, 0.5]))
