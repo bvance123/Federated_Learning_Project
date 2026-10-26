@@ -6,6 +6,11 @@ import torch
 from torch import nn
 from fl.model import get_weights
 
+import torch
+from torch import nn
+
+from fl.model import get_weights, set_weights
+
 
 def local_update(model, global_weights, train_data, mu, epochs, lr=0.01, batch_size=32):
     """Train one hospital's model starting from the global weights.
