@@ -2,6 +2,9 @@
 
 Owner: Nikolay
 """
+import torch
+from torch import nn
+from fl.model import get_weights
 
 import torch
 from torch import nn
@@ -9,7 +12,7 @@ from torch import nn
 from fl.model import get_weights, set_weights
 
 
-def local_update(model, global_weights, train_data, mu, epochs):
+def local_update(model, global_weights, train_data, mu, epochs, lr=0.01, batch_size=32):
     """Train one hospital's model starting from the global weights.
 
     model:          fl.model.Model (a fresh copy; safe to modify)
@@ -23,46 +26,65 @@ def local_update(model, global_weights, train_data, mu, epochs):
       mu = 0       -> same as plain local training
       mu very big  -> stays almost identical to global_weights
     """
-    if mu < 0:
-      raise ValueError("mu must be non-negative")
-    if epochs < 0:
-      raise ValueError("epochs must be non-negative")
-
-    X, y = train_data
-    parameters = dict(model.named_parameters())
-    if not parameters:
-      raise ValueError("model must have at least one parameter")
-    if X.ndim != 2 or y.ndim != 1 or X.shape[0] != y.shape[0]:
-      raise ValueError("train_data must contain X [n, features] and y [n]")
-    if X.shape[0] == 0:
-      raise ValueError("train_data must not be empty")
-
-    first_parameter = next(iter(parameters.values()))
-    X = X.to(device=first_parameter.device, dtype=first_parameter.dtype)
-    y = y.to(device=first_parameter.device, dtype=first_parameter.dtype)
-
-    set_weights(model, global_weights)
-    reference = {
-      name: global_weights[name].to(device=parameter.device, dtype=parameter.dtype)
-      for name, parameter in parameters.items()
-    }
-
-    optimizer = torch.optim.SGD(
-      model.parameters(), lr=0.1 / (1.0 + float(mu))
-    )
-    criterion = nn.BCELoss()
+    # TODO (Nikolay)
+   
+    # 1. Copy the global weights into the model
+    cloned={}
+    for name in global_weights:
+        cloned[name]=global_weights[name].clone()
+    model.load_state_dict(cloned)
     model.train()
 
-    for _ in range(epochs):
-      optimizer.zero_grad(set_to_none=True)
-      loss = criterion(model(X), y)
-      if mu:
-        penalty = sum(
-          (parameter - reference[name]).square().sum()
-          for name, parameter in parameters.items()
-        )
-        loss = loss + (float(mu) / 2.0) * penalty
-      loss.backward()
-      optimizer.step()
 
+    # 2. Frozen reference copy for the leash term
+    global_params=[]
+    for p in model.parameters():
+        global_params.append(p.detach().clone())
+
+    # 3. Training loop
+    X, y = train_data
+    n = X.shape[0]
+    loss_fn = nn.BCELoss()
+
+    #object which actually changes the weights
+    opt = torch.optim.SGD(model.parameters(), lr=lr)
+
+    for epoch in range(epochs):
+
+        #Randomly shuffle patient indeces after each epoch
+        perm = torch.randperm(n)
+        for i in range(0, n, batch_size):
+            idx = perm[i:i + batch_size]
+            opt.zero_grad()
+
+            #Make predictions
+            probs = model(X[idx])
+
+            #Define loss function
+            loss = loss_fn(probs, y[idx])
+
+            if mu > 0:
+                params = list(model.parameters())
+                prox = 0
+                for j in range(len(params)):
+
+                    #Find difference between local and global model
+                    diff = params[j] - global_params[j]
+
+                    # diff: adds up the numbers inside ONE tensor (the 13 weights, or the 1 bias)
+                     #prox:adds those per-tensor totals together
+                    prox = prox + (diff ** 2).sum()
+
+                #Add mu to loss function
+                loss = loss + (mu / 2) * prox
+
+            loss.backward()
+            opt.step()
+
+        
     return get_weights(model)
+
+
+
+
+
