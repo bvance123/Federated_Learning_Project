@@ -101,6 +101,7 @@ def test_evaluate_builds_row_from_hand_example():
     row = evaluate("local_only", 2, 0, Y_TRUE, Y_PROB)
     assert list(row) == COLUMNS
     assert row["method"] == "local_only" and row["center"] == 2 and row["seed"] == 0
+    assert row["n_test"] == 6  # six patients in the hand example
     assert row["mu"] == ""  # no leash for local-only
     assert row["auroc"] == pytest.approx(8 / 9)
     assert row["sensitivity"] == pytest.approx(2 / 3)
