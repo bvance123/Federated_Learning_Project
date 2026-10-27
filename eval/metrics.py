@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 
 # Shared results CSV format (one row per method, hospital, seed, mu)
-COLUMNS = ["method", "center", "seed", "mu", "auroc", "sensitivity", "ece", "brier"]
+COLUMNS = ["method", "center", "seed", "n_test", "mu", "auroc", "sensitivity", "ece", "brier"]
 
 
 def sensitivity(y_true, y_prob, cutoff=0.5):
@@ -112,6 +112,7 @@ def evaluate(method, center, seed, y_true, y_prob, mu=None):
         "method": method,
         "center": center,
         "seed": seed,
+        "n_test": len(y_true),  # test-set size: small sites give noisier scores
         "mu": "" if mu is None else mu,
         "auroc": auroc(y_true, y_prob),
         "sensitivity": sensitivity(y_true, y_prob),
