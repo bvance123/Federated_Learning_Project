@@ -32,12 +32,12 @@ def combine_partitions(data, centers, split):
     return X, y
 
 
-def run_local_only(data, epochs=50, lr=0.01, batch_size=32):
+def run_local_only(data, epochs=50, lr=0.01, batch_size=32, seed=0):
     """Train one independent model per center."""
     results = {}
 
     for center in CENTERS:
-        torch.manual_seed(0)
+        torch.manual_seed(seed)
         model = Model()
         initial_weights = get_weights(model)
 
@@ -57,11 +57,11 @@ def run_local_only(data, epochs=50, lr=0.01, batch_size=32):
     return results
 
 
-def run_pooled(data, epochs=50, lr=0.01, batch_size=32):
+def run_pooled(data, epochs=50, lr=0.01, batch_size=32, seed=0):
     """Train one model on all centers' training data."""
     pooled_train = combine_partitions(data, CENTERS, "train")
 
-    torch.manual_seed(0)
+    torch.manual_seed(seed)
     model = Model()
     initial_weights = get_weights(model)
 
