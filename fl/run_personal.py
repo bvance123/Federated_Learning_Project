@@ -7,6 +7,7 @@ from fl.client import local_update, predict
 from fl.model import Model, get_weights
 from eval.metrics import auroc, evaluate, append_rows
 from fl.baselines import run_local_only
+import os
 
 #Define simulation variables
 SEEDS = [0, 1, 2]
@@ -14,6 +15,9 @@ NAMES = {0: "Cleveland", 1: "Hungary", 2: "Switzerland", 3: "Long Beach VA"}
 N_ROUNDS = 20
 EPOCHS = 1
 
+
+if os.path.exists("results.csv"):
+    os.remove("results.csv")
 
 #Iterate through different seeds so that results don't depend 
 #on a singular seed
@@ -52,6 +56,14 @@ for seed in SEEDS:
         row = evaluate("personal_adaptive", center, seed, y_test, probs, mu=mu[name])
         rows.append(row)
     append_rows(rows, "results.csv")
+
+    #Add local results to results.csv
+    local_rows = []
+    for center in [0, 1, 2, 3]:
+        X_test, y_test = data[center]["test"]
+        probs = predict(get_weights(local_models[center]), X_test)
+        local_rows.append(evaluate("local_only", center, seed, y_test, probs))
+    append_rows(local_rows, "results.csv")
 
     # 5. save the mu history
     with open(f"mu_history_seed{seed}.csv", "w", newline="") as f:
