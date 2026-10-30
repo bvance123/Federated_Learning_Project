@@ -68,6 +68,35 @@ def run_tests():
     print(f"Test 4  mu=0 vs mu=1e-9 difference: {gap:.2e}")
     assert gap < 1e-3, "FAIL: tiny mu should behave like mu = 0"
 
+
+        # ---- Test 5: init_weights ----
+    torch.manual_seed(5)
+    v = get_weights(Model())                 # a different starting point than g
+    assert dist(v, g) > 1e-3, "FAIL: v should differ from g"
+
+    # 5a: init_weights=g behaves exactly like not passing it
+    torch.manual_seed(2)
+    w_none = local_update(Model(), g, (X, y), mu=1, epochs=20)
+    torch.manual_seed(2)
+    w_g = local_update(Model(), g, (X, y), mu=1, epochs=20, init_weights=g)
+    gap = dist(w_none, w_g)
+    print(f"Test 5a init_weights=g vs none, difference: {gap:.2e}")
+    assert gap < 1e-6, "FAIL: init_weights=g should match the default"
+
+    # 5b: with zero epochs, the result is exactly where we told it to start
+    w_v = local_update(Model(), g, (X, y), mu=1, epochs=0, init_weights=v)
+    print(f"Test 5b epochs=0: dist to v = {dist(w_v, v):.2e}, dist to g = {dist(w_v, g):.4f}")
+    assert dist(w_v, v) < 1e-6, "FAIL: should start from init_weights"
+    assert dist(w_v, g) > 1e-3, "FAIL: should not have started from global_weights"
+
+    # 5c: the leash pulls toward g, not toward where we started (v)
+    torch.manual_seed(2)
+    w_pull = local_update(Model(), g, (X, y), mu=50, epochs=50, init_weights=v)
+    d_before = dist(v, g)
+    d_after = dist(w_pull, g)
+    print(f"Test 5c start at v, mu=50: dist to g before = {d_before:.4f}, after = {d_after:.4f}")
+    assert d_after < 0.2 * d_before, "FAIL: leash should pull toward the global weights"
+
     print("\nAll tests passed.")
 
 
