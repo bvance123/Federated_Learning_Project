@@ -2,17 +2,36 @@
 
 Owner: Nikolay
 """
-import torch
-from torch import nn
-from fl.model import get_weights
 
 import torch
 from torch import nn
 
-from fl.model import get_weights, set_weights
+from fl.model import Model,get_weights, set_weights
 
 
-def local_update(model, global_weights, train_data, mu, epochs, lr=0.01, batch_size=32):
+
+def predict(model_weights, X):
+    """Run patients through a model, return P(disease)."""
+
+    #Define the model
+
+    #Define the global model from Bennett's class
+    model=Model()
+
+    #Load the model weights into Bennett's global model
+    model.load_state_dict(model_weights)
+
+    #Set to prediction mode. No training is performed
+    model.eval()
+
+    #Stop tracking gradients since we are not training
+    with torch.no_grad():
+        #This runs patients through model to actually make predictions
+        return model(X)
+
+
+
+def local_update(model, global_weights, train_data, mu, epochs, lr=0.01, batch_size=32, init_weights=None):
     """Train one hospital's model starting from the global weights.
 
     model:          fl.model.Model (a fresh copy; safe to modify)
@@ -30,16 +49,27 @@ def local_update(model, global_weights, train_data, mu, epochs, lr=0.01, batch_s
    
     # 1. Copy the global weights into the model
     cloned={}
-    for name in global_weights:
-        cloned[name]=global_weights[name].clone()
+
+    # init_weights lets the model start from custom weights instead of the
+    # global weights. This is for later in the simulation, when this method
+    # is called after the first run and we want to continue from a previously
+    # established personal model. The leash below still pulls toward the
+    # GLOBAL weights, whichever starting point is used.
+    if init_weights:
+        start=init_weights
+    else:
+        start=global_weights
+
+    for name in start:
+        cloned[name]=start[name].clone()
     model.load_state_dict(cloned)
     model.train()
 
 
     # 2. Frozen reference copy for the leash term
     global_params=[]
-    for p in model.parameters():
-        global_params.append(p.detach().clone())
+    for name,p in model.named_parameters():
+        global_params.append(global_weights[name].detach().clone())
 
     # 3. Training loop
     X, y = train_data
